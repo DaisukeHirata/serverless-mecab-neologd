@@ -1,17 +1,37 @@
-# Japanese Tokenizer for AWS Lambda
-AWS Lambdaで日本語形態素解析（MeCab）を使うためのサンプルプロジェクトです。
-MeCabはコードにネイティブバイナリを使用している為、以下のリンク先を参考にLambda実行環境と同じ環境でコンパイルしてください。(Amazon Linux)
+# MeCab NEologd for AWS Lambda
 
-※ 参考: [Lambda 実行環境と利用できるライブラリ](http://docs.aws.amazon.com/ja_jp/lambda/latest/dg/current-supported-versions.html)
+This is a sample project to build NEologd dictionary in Docker, deploy AWS Lambda with mecab by serverless framework
 
-## About lambda function
-Amazon API Gateway + Lambda でサーバーレスの形態素解析API作ったりとか、他のLambdaから呼び出して、形態素解析用のファンクションとして使うとか、とかとか。。
+## Prerequisites
+1. Create an AIM user with `AmazonS3FullAccess` privilage.
+2. Create an S3 bucket called `serverless-mecab-neologd-dict`
+3. Install Serverless Framework, setup properly
+4. Setup Docker properly
+
+## Build the dictionary and upload to s3
+- Build docker image
+
+```shell
+docker build -t dictionary-s3push .
+```
+
+- Run image to push to s3 (pass aws credentials)
+```shell
+docker run -e AWS_DEFAULT_REGION=ap-northeast-1 \
+    -e AWS_ACCESS_KEY_ID=<acces key id> \
+    -e AWS_SECRET_ACCESS_KEY=<secret access key> \
+    dictionary-s3push
+```
+
+## API endpoint with Lambda, APIGateway, Serverless framework
+
+- Deploy
+```shell
+serverless deploy
+```
 
 #### Runtime
 Python 2.7
-
-#### Lambda Hander
-lambda_function.lambda_handler
 
 #### Input event
 
@@ -41,145 +61,94 @@ Input event sample:
   * 3: MECAB_EOS_NODE
 
 
-Execution result sample:
-```python
-{
-  "tokens": [
-    {
-      "reading": "キョウ",
-      "pos": "名詞-副詞可能",
-      "baseform": "今日",
-      "surface": "今日",
-      "feature": "名詞,副詞可能,*,*,*,*,今日,キョウ,キョー"
-    },
-    {
-      "reading": "ヨイ",
-      "pos": "形容詞-自立",
-      "baseform": "良い",
-      "surface": "良い",
-      "feature": "形容詞,自立,*,*,形容詞・アウオ段,基本形,良い,ヨイ,ヨイ"
-    },
-    {
-      "reading": "テンキ",
-      "pos": "名詞-一般",
-      "baseform": "天気",
-      "surface": "天気",
-      "feature": "名詞,一般,*,*,*,*,天気,テンキ,テンキ"
-    },
-    {
-      "reading": "デス",
-      "pos": "助動詞",
-      "baseform": "です",
-      "surface": "です",
-      "feature": "助動詞,*,*,*,特殊・デス,基本形,です,デス,デス"
-    },
-    {
-      "reading": "。",
-      "pos": "記号-句点",
-      "baseform": "。",
-      "surface": "。",
-      "feature": "記号,句点,*,*,*,*,。,。,。"
-    }
-  ]
-}
+## Example
+
+- Call api with curl
+```shell
+curl -G --data-urlencode "sentence=彼女はペンパイナッポーアッポーペンと恋ダンスを踊った。" https://xxxxxxxx.execute-api.ap-northeast-1.amazonaws.com/dev/tokenize | jq
 ```
 
-## Setup on local machine
-ローカルでLambda関数を実行するには、最初に以下のステプで環境をセットアップしてください。
-なお、MeCab本体とIPA辞書は、``./local``配下にインストールされます。
-
-```bash
-# 1. Clone this repository with AWS Lambda function name.
-git clone https://github.com/KunihikoKido/aws-lambda-ja-tokenizer.git ja-tokenizer
-
-# 2. Create and Activate a virtualenv
-cd ja-tokenizer
-virtualenv env
-source env/bin/activate
-
-# 3. Install python modules for local machine.
-pip install -r requirements/local.txt
-
-# 4. Compile and Install MeCab and etc.
-fab setup
-```
-
-> **注意**
-> mecab-ipadic-neologd をシステム辞書に含める場合は、``fab setup`` 以下の問いで``y``を入力してください。
->
-> ``Do you want to install mecab-ipadic-neologd? [y/N] ``
->
-> ただし、サイズが大きいためLambdaのパッケージサイズ制限を超えてしまいます。。
-
-
-## Run lambda function on local machine
-ローカルでLambda関数を実行するには、``fab invoke``コマンドを実行します。
-
-```bash
-fab invoke
-```
-
-#### Custom event
-通常はインプットイベントに``event.json``が使用されますが、他のファイルを使用することも可能です。
-
-以下の例は、新たに作成した``custom-event.json``をインプットイベントに指定して実行する例です。
-
-```bash
-fab invoke:custom-event.json
-```
-
-
-## Make bundle zip
-以下のステップで、AWS Lambda に登録可能な ``lambda_function.zip`` ファイルが作成されます。
-
-```bash
-fab makezip
-```
-※ ZIPファイルは10MB超えるので、S3経由アップロードしてください。
-
-## Update function code on AWS Lambda
-
-```bash
-fab aws-updatecode
-```
-
-## Invoke function on AWS Lambda
-
-```bash
-fab aws-invoke
-```
-
-## Get function configuration on AWS Lambda
-
-```bash
-fab aws-getconfig
-```
-
-## Snapshot Builds
-ビルド済みの``lambda_function.zip``は以下のURLを参照してください。
-
-https://github.com/KunihikoKido/aws-lambda-ja-tokenizer/releases
-
-## with Amazon API Gateway
-### _Example Settings_
-
-_Method and Resources:_
-```
-GET /tokenize
-```
-_Query Strings:_
-* ``sentence``: センテンス
-* ``stoptags``: 除外品詞タグ
-
-_Request mapping template:_
+- Response
 ```json
-{
-  "sentence": "$util.urlDecode($input.params('sentence'))",
-  "stoptags": "$util.urlDecode($input.params('stoptags'))"
-}
+[
+  {
+    "stat": 0,
+    "baseform": "彼女",
+    "feature": "名詞,代名詞,一般,*,*,*,彼女,カノジョ,カノジョ",
+    "surface": "彼女",
+    "pos": "名詞-代名詞-一般",
+    "reading": "カノジョ"
+  },
+  {
+    "stat": 0,
+    "baseform": "は",
+    "feature": "助詞,係助詞,*,*,*,*,は,ハ,ワ",
+    "surface": "は",
+    "pos": "助詞-係助詞",
+    "reading": "ハ"
+  },
+  {
+    "stat": 0,
+    "baseform": "ペンパイナッポーアッポーペン",
+    "feature": "名詞,固有名詞,一般,*,*,*,ペンパイナッポーアッポーペン,ペンパイナッポーアッポーペン,ペンパイナッポーアッポーペン",
+    "surface": "ペンパイナッポーアッポーペン",
+    "pos": "名詞-固有名詞-一般",
+    "reading": "ペンパイナッポーアッポーペン"
+  },
+  {
+    "stat": 0,
+    "baseform": "と",
+    "feature": "助詞,並立助詞,*,*,*,*,と,ト,ト",
+    "surface": "と",
+    "pos": "助詞-並立助詞",
+    "reading": "ト"
+  },
+  {
+    "stat": 0,
+    "baseform": "恋ダンス",
+    "feature": "名詞,固有名詞,一般,*,*,*,恋ダンス,コイダンス,コイダンス",
+    "surface": "恋ダンス",
+    "pos": "名詞-固有名詞-一般",
+    "reading": "コイダンス"
+  },
+  {
+    "stat": 0,
+    "baseform": "を",
+    "feature": "助詞,格助詞,一般,*,*,*,を,ヲ,ヲ",
+    "surface": "を",
+    "pos": "助詞-格助詞-一般",
+    "reading": "ヲ"
+  },
+  {
+    "stat": 0,
+    "baseform": "踊",
+    "feature": "名詞,一般,*,*,*,*,踊,オドリ,オドリ",
+    "surface": "踊",
+    "pos": "名詞-一般",
+    "reading": "オドリ"
+  },
+  {
+    "stat": 1,
+    "baseform": "*",
+    "feature": "名詞,一般,*,*,*,*,*",
+    "surface": "った",
+    "pos": "名詞-一般",
+    "reading": "*"
+  },
+  {
+    "stat": 0,
+    "baseform": "。",
+    "feature": "記号,句点,*,*,*,*,。,。,。",
+    "surface": "。",
+    "pos": "記号-句点",
+    "reading": "。"
+  }
+]
 ```
 
-_Example Request:_
-```bash
-GET /tokenize?sentence=%E4%BB%8A%E6%97%A5%E3%81%AF%E8%89%AF%E3%81%84%E5%A4%A9%E6%B0%97%E3%81%A7%E3%81%99
-```
+## Appendix
+
+MeCabはコードにネイティブバイナリを使用している為、以下のリンク先を参考にLambda実行環境と同じ環境でコンパイルしてください。(Amazon Linux)
+
+※ 参考: [Lambda 実行環境と利用できるライブラリ](http://docs.aws.amazon.com/ja_jp/lambda/latest/dg/current-supported-versions.html)
+
