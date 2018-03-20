@@ -152,3 +152,7 @@ MeCabはコードにネイティブバイナリを使用している為、以下
 
 ※ 参考: [Lambda 実行環境と利用できるライブラリ](http://docs.aws.amazon.com/ja_jp/lambda/latest/dg/current-supported-versions.html)
 
+## reference
+
+https://github.com/KunihikoKido/aws-lambda-ja-tokenizer
+https://speakerdeck.com/satorukadowaki/aws-apigateway-plus-python-lambda-plus-neologddezuo-rusabaresuri-ben-yu-xing-tai-su-jie-xi-api
